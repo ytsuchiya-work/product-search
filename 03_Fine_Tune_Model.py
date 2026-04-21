@@ -14,7 +14,18 @@
 # COMMAND ----------
 
 # DBTITLE 1,Install Required Libraries
-# MAGIC %pip install sentence-transformers==2.2.2 langchain==0.0.179 chromadb==0.3.25 typing-inspect==0.8.0 typing_extensions==4.5.0
+# MAGIC %pip install langchain-community==0.2.16 langchain-chroma==0.1.4 chromadb==0.4.24 "huggingface_hub<0.24"
+
+# COMMAND ----------
+
+# DBTITLE 1,Patch typing_extensions for DBR 14.3 compatibility
+import typing_extensions
+if not hasattr(typing_extensions, 'deprecated'):
+  def _deprecated_shim(__msg, *, category=DeprecationWarning, stacklevel=1):
+    def decorator(func):
+      return func
+    return decorator
+  typing_extensions.deprecated = _deprecated_shim
 
 # COMMAND ----------
 
@@ -23,9 +34,9 @@ from sentence_transformers import SentenceTransformer, util, InputExample, losse
 import torch
 from torch.utils.data import DataLoader
 
-from langchain.document_loaders import DataFrameLoader
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
+from langchain_community.document_loaders import DataFrameLoader
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
 
 import numpy as np
 import pandas as pd
@@ -346,11 +357,14 @@ documents = (
 # COMMAND ----------
 
 # DBTITLE 1,Load Model as HuggingFaceEmbeddings Object
-# encoder path
-embedding_model_path = f"/dbfs{config['dbfs_path']}/tuned_model"
+# encoder path (use local disk to avoid DBFS I/O issues)
+import shutil, os
+embedding_model_path = f"/local_disk0/tmp{config['dbfs_path']}/tuned_model"
 
 # make sure path is clear
-dbutils.fs.rm(embedding_model_path.replace('/dbfs','dbfs:'), recurse=True)
+if os.path.exists(embedding_model_path):
+  shutil.rmtree(embedding_model_path)
+os.makedirs(embedding_model_path, exist_ok=True)
 
 # reload model using langchain wrapper
 tuned_model.save(embedding_model_path)
@@ -359,11 +373,13 @@ embedding_model = HuggingFaceEmbeddings(model_name=embedding_model_path)
 # COMMAND ----------
 
 # DBTITLE 1,Generate Embeddings from Product Info
-# chromadb path
-chromadb_path = f"/dbfs{config['dbfs_path']}/tuned_chromadb"
+# chromadb path (use local disk to avoid DBFS SQLite I/O issues)
+chromadb_path = f"/local_disk0/tmp{config['dbfs_path']}/tuned_chromadb"
 
 # make sure chromadb path is clear
-dbutils.fs.rm(chromadb_path.replace('/dbfs','dbfs:'), recurse=True)
+if os.path.exists(chromadb_path):
+  shutil.rmtree(chromadb_path)
+os.makedirs(chromadb_path, exist_ok=True)
 
 # generate embeddings
 vectordb = Chroma.from_documents(
@@ -372,8 +388,7 @@ vectordb = Chroma.from_documents(
   persist_directory=chromadb_path
   )
 
-# persist vector db
-vectordb.persist()
+# chromadb 0.4.x persists automatically
 
 # COMMAND ----------
 
@@ -386,8 +401,8 @@ class ProductSearchWrapper(mlflow.pyfunc.PythonModel):
 
     # import required libraries
     import pandas as pd
-    from langchain.embeddings import HuggingFaceEmbeddings
-    from langchain.vectorstores import Chroma
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+    from langchain_chroma import Chroma
 
     # retrieve embedding model
     embedding_model = HuggingFaceEmbeddings(model_name=context.artifacts['embedding_model'])
@@ -436,8 +451,8 @@ class ProductSearchWrapper(mlflow.pyfunc.PythonModel):
 
 # DBTITLE 1,Identify Model Artifacts
 artifacts = {
-  'embedding_model': embedding_model_path.replace('/dbfs','dbfs:'), 
-  'chromadb': chromadb_path.replace('/dbfs','dbfs:')
+  'embedding_model': embedding_model_path,
+  'chromadb': chromadb_path
   }
 
 print(
@@ -448,9 +463,6 @@ print(
 
 # DBTITLE 1,Define Environment Requirements
 import pandas
-import langchain
-import chromadb
-import sentence_transformers
 
 # get base environment configuration
 conda_env = mlflow.pyfunc.get_default_conda_env()
@@ -458,9 +470,10 @@ conda_env = mlflow.pyfunc.get_default_conda_env()
 # define packages required by model
 packages = [
   f'pandas=={pandas.__version__}',
-  f'langchain=={langchain.__version__}',
-  f'chromadb=={chromadb.__version__}',
-  f'sentence_transformers=={sentence_transformers.__version__}'
+  'langchain-community==0.2.16',
+  'langchain-chroma==0.1.4',
+  'chromadb==0.4.24',
+  'sentence-transformers'
   ]
 
 # add required packages to environment configuration

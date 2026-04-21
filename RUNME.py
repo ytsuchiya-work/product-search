@@ -101,7 +101,7 @@ job_json = {
             {
                 "job_cluster_key": "prod_search_cluster",
                 "new_cluster": {
-                    "spark_version": "12.2.x-gpu-ml-scala2.12",
+                    "spark_version": "14.3.x-gpu-ml-scala2.12",
                 "spark_conf": {
                     "spark.master": "local[*, 4]",
                     "spark.databricks.cluster.profile": "singleNode",

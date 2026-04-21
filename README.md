@@ -128,12 +128,12 @@ flowchart LR
 
 | コンポーネント | 技術 | バージョン |
 |---|---|---|
-| 埋め込みモデル | `all-MiniLM-L12-v2` (sentence-transformers) | 2.2.2 |
-| ベクトルストア | ChromaDB | 0.3.25 |
-| オーケストレーション | LangChain | 0.0.179 |
+| 埋め込みモデル | `all-MiniLM-L12-v2` (sentence-transformers) | 2.7.0 |
+| ベクトルストア | ChromaDB | 0.4.24 |
+| オーケストレーション | LangChain Community + Chroma + HuggingFace | 0.2.16 |
 | モデル管理 | MLflow | (Databricks 組み込み) |
 | モデルサービング | Databricks Model Serving | REST API |
-| データ基盤 | Delta Lake on Databricks | Spark 12.2.x GPU ML |
+| データ基盤 | Delta Lake on Databricks | Spark 14.3.x GPU ML |
 | データセット | WANDS (Wayfair) | 42K 商品, 233K ラベル |
 
 ---
@@ -156,7 +156,7 @@ flowchart LR
 ### 前提条件
 
 - GPU 対応クラスタが利用可能な Databricks ワークスペース
-- Databricks Runtime: **12.2.x GPU ML** 以上
+- Databricks Runtime: **14.3.x GPU ML** 以上
 - 推奨インスタンス: `g5.8xlarge` (AWS) / `Standard_NC12s_v3` (Azure)
 - シングルノードクラスタで動作可能
 
@@ -208,7 +208,7 @@ flowchart LR
 |------|------|--------|
 | `OSError: Can't load tokenizer for 'all-MiniLM-L12-v2'` | HuggingFace Hub へのアクセス不可 | プロキシ設定またはオフラインモードを確認。事前にモデルをダウンロードして DBFS に配置 |
 | コサイン類似度が改善しない | エポック数が少ない / データ品質の問題 | `epochs` を 2-5 に増やす。教師なし学習は特に複数エポックが必要 |
-| `chromadb.errors.InvalidCollectionException` | ChromaDB バージョン不整合 | `%pip install chromadb==0.3.25` でバージョンを固定 |
+| `chromadb.errors.InvalidCollectionException` | ChromaDB バージョン不整合 | `%pip install chromadb==0.4.24` でバージョンを固定 |
 
 ### ファインチューニング関連
 
